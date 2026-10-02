@@ -47,6 +47,7 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [memoInput, setMemoInput] = useState("");
   const [completed, setCompleted] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [sessionStats, setSessionStats] = useState({
     again: 0,
     hard: 0,
@@ -72,9 +73,10 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
       setMemoInput(currentCard.userMemo || "");
       setDragOffset({ x: 0, y: 0 });
     }
-  }, [currentIndex, currentCard]);
+  }, [currentIndex]);
 
   const handleFlip = () => {
+    if (isTransitioning) return;
     setIsFlipped((prev) => {
       const next = !prev;
       playFlipSound();
@@ -82,9 +84,13 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
     });
   };
 
-  const handleRating = async (rating: RatingType) => {
-    if (!currentCard) return;
+  /**
+   * High-responsiveness, zero-spoiler SRS rating handler
+   */
+  const handleRating = (rating: RatingType) => {
+    if (!currentCard || isTransitioning) return;
 
+    // 1. Instant sound feedback
     if (rating === "good" || rating === "easy") {
       playCorrectChime();
     } else if (rating === "again") {
@@ -93,15 +99,14 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
       playFlipSound();
     }
 
+    // 2. Optimistic non-blocking database update
     const newProgress = calculateSrsRating(currentCard, rating);
-
-    try {
-      await saveCardProgress(database, uid, currentCard.progressKey, newProgress);
-      onProgressUpdated(currentCard.progressKey, newProgress);
-    } catch (err) {
+    saveCardProgress(database, uid, currentCard.progressKey, newProgress).catch((err) => {
       console.error("Failed to save progress to RTDB:", err);
-    }
+    });
+    onProgressUpdated(currentCard.progressKey, newProgress);
 
+    // 3. Update session statistics immediately
     setSessionStats((prev) => ({
       ...prev,
       [rating]: prev[rating] + 1,
@@ -119,21 +124,35 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
       setSessionCards((prev) => [...prev, updatedCard]);
     }
 
-    if (currentIndex + 1 < sessionCards.length) {
-      setCurrentIndex((prev) => prev + 1);
-    } else {
-      setCompleted(true);
-      playFanfare();
-      try {
-        confetti({
-          particleCount: 70,
-          spread: 60,
-          origin: { y: 0.6 }
-        });
-      } catch {
-        // Ignore
+    // 4. Smooth, instant card transition without showing next card's answer
+    // Start transition: card slides out slightly and fades, preventing flip-back spoiler
+    setIsTransitioning(true);
+
+    setTimeout(() => {
+      // Immediately reset flip state so the next card mounts cleanly from front
+      setIsFlipped(false);
+      setShowHint(false);
+      setIsEditingMemo(false);
+      setDragOffset({ x: 0, y: 0 });
+
+      if (currentIndex + 1 < sessionCards.length) {
+        setCurrentIndex((prev) => prev + 1);
+        setIsTransitioning(false);
+      } else {
+        setCompleted(true);
+        setIsTransitioning(false);
+        playFanfare();
+        try {
+          confetti({
+            particleCount: 70,
+            spread: 60,
+            origin: { y: 0.6 }
+          });
+        } catch {
+          // Ignore
+        }
       }
-    }
+    }, 140);
   };
 
   const handleSaveMemo = async () => {
@@ -148,6 +167,7 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
   };
 
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    if (isTransitioning) return;
     const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     setTouchStartX(clientX);
@@ -156,7 +176,7 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (touchStartX === null || touchStartY === null || !isDragging) return;
+    if (touchStartX === null || touchStartY === null || !isDragging || isTransitioning) return;
     const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     const diffX = clientX - touchStartX;
@@ -165,7 +185,7 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
   };
 
   const handleTouchEnd = () => {
-    if (!isDragging) return;
+    if (!isDragging || isTransitioning) return;
     setIsDragging(false);
 
     const swipeThreshold = 80;
@@ -260,64 +280,65 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black text-white select-none overflow-hidden safe-bottom">
-      {/* Top Header */}
-      <div className="flex h-14 items-center justify-between px-4 border-b border-white/[0.08] bg-black/90 backdrop-blur-xl">
-        <button
-          onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#14151a] border border-white/[0.1] text-zinc-400 hover:text-white"
-        >
-          <X className="h-4 w-4" />
-        </button>
+      {/* Top Header with safe-top for notch clearance */}
+      <div className="flex flex-col border-b border-white/[0.08] bg-black/95 backdrop-blur-xl safe-top shrink-0">
+        <div className="flex h-14 items-center justify-between px-4">
+          <button
+            onClick={onClose}
+            aria-label="戻る"
+            className="flex h-10 w-10 min-h-10 min-w-10 items-center justify-center rounded-xl bg-[#14151a] border border-white/[0.12] text-zinc-300 hover:text-white active:scale-90 active:bg-zinc-800 transition-all touch-manipulation cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-        <div className="flex items-center gap-2 text-xs font-mono tabular-nums">
-          <span className="font-extrabold text-white">
-            {currentIndex + 1} / {sessionCards.length}
-          </span>
-          <span className="text-zinc-600">·</span>
-          <span className="text-zinc-400 text-[11px] whitespace-nowrap">
-            残り {sessionCards.length - (currentIndex + 1)}問
-          </span>
+          <div className="flex items-center gap-2 text-xs font-mono tabular-nums">
+            <span className="font-extrabold text-white text-sm">
+              {currentIndex + 1} / {sessionCards.length}
+            </span>
+            <span className="text-zinc-600">·</span>
+            <span className="text-zinc-400 text-xs whitespace-nowrap">
+              残り {sessionCards.length - (currentIndex + 1)}問
+            </span>
+          </div>
+
+          <button
+            onClick={handleFlip}
+            aria-label="カード反転"
+            className="flex h-10 w-10 min-h-10 min-w-10 items-center justify-center rounded-xl bg-[#14151a] border border-white/[0.12] text-zinc-300 hover:text-white active:scale-90 active:bg-zinc-800 transition-all touch-manipulation cursor-pointer"
+            title="カード反転"
+          >
+            <RotateCw className="h-4 w-4" />
+          </button>
         </div>
-
-        <button
-          onClick={handleFlip}
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#14151a] border border-white/[0.1] text-zinc-300 hover:text-white"
-          title="カード反転"
-        >
-          <RotateCw className="h-3.5 w-3.5" />
-        </button>
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full bg-zinc-950 h-0.5">
+      <div className="h-1 w-full bg-zinc-900 shrink-0">
         <div
-          className="h-0.5 bg-white transition-all duration-300 shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+          className="h-full bg-white transition-all duration-300 shadow-[0_0_8px_rgba(255,255,255,0.5)]"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
 
-      {/* Center Card Arena */}
-      <div className="relative flex-1 flex items-center justify-center p-4 perspective-1000">
-        {/* Swipe stamps */}
+      {/* Card Arena Container */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        {/* Swipe Overlays */}
         {isSwipingRight && (
-          <div
-            className="absolute top-10 right-6 z-30 pointer-events-none rounded-xl border-2 border-emerald-400 bg-emerald-950/80 px-3.5 py-1 font-black text-emerald-300 text-sm whitespace-nowrap rotate-6 transition-opacity shadow-lg"
-            style={{ opacity: Math.min(1, Math.abs(dragOffset.x) / 70) }}
-          >
-            覚えた
+          <div className="absolute right-6 top-8 z-30 flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 px-4 py-1.5 text-xs font-extrabold text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse whitespace-nowrap">
+            <Check className="h-4 w-4" />
+            <span>覚えた (Good)</span>
           </div>
         )}
         {isSwipingLeft && (
-          <div
-            className="absolute top-10 left-6 z-30 pointer-events-none rounded-xl border-2 border-rose-400 bg-rose-950/80 px-3.5 py-1 font-black text-rose-300 text-sm whitespace-nowrap -rotate-6 transition-opacity shadow-lg"
-            style={{ opacity: Math.min(1, Math.abs(dragOffset.x) / 70) }}
-          >
-            もう一度
+          <div className="absolute left-6 top-8 z-30 flex items-center gap-1.5 rounded-full bg-rose-500/20 border border-rose-500/50 px-4 py-1.5 text-xs font-extrabold text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.3)] animate-pulse whitespace-nowrap">
+            <X className="h-4 w-4" />
+            <span>もう一度 (Again)</span>
           </div>
         )}
 
-        {/* 3D Flipping Card Container */}
+        {/* 3D Flip Card Container with key to guarantee a fresh, non-flipped card on index advance */}
         <div
+          key={`${currentCard.id}_${currentIndex}`}
           ref={cardRef}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -331,16 +352,21 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
           }}
           style={{
             transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragRotation}deg)`,
-            transition: isDragging ? "none" : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)"
+            opacity: isTransitioning ? 0 : 1,
+            transition: isDragging
+              ? "none"
+              : isTransitioning
+              ? "opacity 0.14s ease-out, transform 0.14s ease-out"
+              : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.14s ease-in"
           }}
-          className="relative w-full max-w-sm aspect-[4/5] max-h-[510px] cursor-pointer"
+          className="relative w-full max-w-sm aspect-[4/5] max-h-[510px] cursor-pointer touch-manipulation"
         >
           <div
-            className={`relative w-full h-full preserve-3d transition-transform duration-500 ${
+            className={`relative w-full h-full preserve-3d transition-transform duration-350 ${
               isFlipped ? "rotate-y-180" : ""
             }`}
           >
-            {/* FRONT OF CARD (Pure Obsidian Dark Plate) */}
+            {/* FRONT OF CARD (Question) */}
             <div className="absolute inset-0 flex flex-col justify-between rounded-2xl border border-white/[0.14] bg-gradient-to-b from-[#13141b] to-[#07080b] p-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.95)] backface-hidden">
               {/* Top metadata */}
               <div>
@@ -397,7 +423,7 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
               </div>
             </div>
 
-            {/* BACK OF CARD (Answer) */}
+            {/* BACK OF CARD (Answer) - Backface ONLY renders content when isFlipped is true to eliminate any spoiler */}
             <div className="absolute inset-0 flex flex-col justify-between rounded-2xl border border-white/[0.2] bg-gradient-to-b from-[#181922] to-[#090a0d] p-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.95)] backface-hidden rotate-y-180">
               {/* Back Top */}
               <div className="flex items-center justify-between text-xs">
@@ -411,12 +437,14 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
 
               {/* Answer Content */}
               <div className="flex-1 flex flex-col justify-center items-center text-center my-3 overflow-y-auto px-1">
-                <div className="text-xl sm:text-2xl font-black text-white max-w-full drop-shadow">
-                  <MathRenderer content={currentCard.answer} />
-                </div>
+                {isFlipped && (
+                  <div className="text-xl sm:text-2xl font-black text-white max-w-full drop-shadow">
+                    <MathRenderer content={currentCard.answer} />
+                  </div>
+                )}
 
                 {/* Note */}
-                {currentCard.note && (
+                {currentCard.note && isFlipped && (
                   <div className="mt-3.5 w-full rounded-xl border border-white/[0.08] bg-black/60 p-2.5 text-xs text-zinc-300 text-left">
                     <span className="text-[10px] text-zinc-500 font-semibold block mb-0.5">
                       解説・要点
@@ -426,47 +454,51 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
                 )}
 
                 {/* Personal Card Memo Section */}
-                <div className="mt-3 w-full">
-                  {isEditingMemo ? (
-                    <div
-                      className="rounded-xl border border-white/[0.2] bg-black p-2.5 text-left"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-bold text-zinc-300">マイ語録・メモ</span>
-                        <button
-                          onClick={handleSaveMemo}
-                          className="flex items-center gap-1 rounded bg-white px-2 py-0.5 text-[10px] font-bold text-black hover:bg-zinc-200 whitespace-nowrap"
-                        >
-                          <Check className="h-3 w-3" />
-                          <span>保存</span>
-                        </button>
+                {isFlipped && (
+                  <div className="mt-3 w-full">
+                    {isEditingMemo ? (
+                      <div
+                        className="rounded-xl border border-white/[0.2] bg-black p-2.5 text-left"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-bold text-zinc-300">マイ語録・メモ</span>
+                          <button
+                            onClick={handleSaveMemo}
+                            className="flex items-center gap-1 rounded bg-white px-2 py-0.5 text-[10px] font-bold text-black hover:bg-zinc-200 whitespace-nowrap"
+                          >
+                            <Check className="h-3 w-3" /> 保存
+                          </button>
+                        </div>
+                        <textarea
+                          value={memoInput}
+                          onChange={(e) => setMemoInput(e.target.value)}
+                          placeholder="自分なりの覚え方や語呂合わせ..."
+                          rows={2}
+                          className="w-full rounded-lg border border-white/[0.1] bg-[#111217] p-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white/[0.3]"
+                        />
                       </div>
-                      <textarea
-                        value={memoInput}
-                        onChange={(e) => setMemoInput(e.target.value)}
-                        placeholder="語呂合わせや気づきを入力..."
-                        rows={2}
-                        className="w-full bg-transparent text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none"
-                        autoFocus
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsEditingMemo(true);
-                      }}
-                      className="w-full flex items-center justify-between rounded-xl border border-dashed border-white/[0.12] bg-black/40 px-3 py-2 text-left text-[11px] text-zinc-400 hover:border-white/[0.25] hover:text-zinc-200"
-                    >
-                      <span className="truncate">
-                        {currentCard.userMemo ? `メモ: ${currentCard.userMemo}` : "＋ 自分専用の語録・メモを追加"}
-                      </span>
-                      <Edit3 className="h-3 w-3 shrink-0 ml-1 text-zinc-500" />
-                    </button>
-                  )}
-                </div>
+                    ) : (
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsEditingMemo(true);
+                        }}
+                        className="flex items-center justify-between rounded-xl border border-dashed border-white/[0.12] bg-black/40 px-3 py-2 text-left hover:border-white/[0.25]"
+                      >
+                        <div className="truncate pr-2">
+                          <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+                            マイ語録・メモ
+                          </span>
+                          <span className="truncate text-[11px] text-zinc-300 block">
+                            {currentCard.userMemo || "タップして覚え方やメモを追加..."}
+                          </span>
+                        </div>
+                        <Edit3 className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Bottom Cue */}
@@ -479,7 +511,7 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
       </div>
 
       {/* Swipe hints */}
-      <div className="flex items-center justify-between px-6 pb-2 text-[10px] text-zinc-500 whitespace-nowrap font-medium">
+      <div className="flex items-center justify-between px-6 pb-2 text-[10px] text-zinc-500 whitespace-nowrap font-medium shrink-0">
         <span className="flex items-center gap-1">
           <ArrowLeft className="h-3 w-3" /> 左スワイプ: もう一度
         </span>
@@ -488,53 +520,61 @@ export const FlashcardTrainer: React.FC<FlashcardTrainerProps> = ({
         </span>
       </div>
 
-      {/* Bottom Action Controls */}
-      <div className="border-t border-white/[0.08] bg-black p-3.5 safe-bottom">
+      {/* Bottom Action Controls - Distinct, ultra-responsive touch buttons */}
+      <div className="border-t border-white/[0.08] bg-black/95 p-3.5 safe-bottom shrink-0">
         {!isFlipped ? (
           <button
             onClick={handleFlip}
-            className="w-full rounded-xl bg-white text-black py-3.5 text-sm font-extrabold transition-all hover:bg-zinc-200 active:scale-98 shadow-[0_0_24px_rgba(255,255,255,0.18)] whitespace-nowrap"
+            className="w-full rounded-2xl bg-white text-black py-4 text-sm font-black transition-all hover:bg-zinc-200 active:scale-98 shadow-[0_0_24px_rgba(255,255,255,0.18)] whitespace-nowrap touch-manipulation cursor-pointer"
           >
             答えを見る (タップで裏返す)
           </button>
         ) : (
           <div className="grid grid-cols-4 gap-2">
-            {/* 1. Again */}
+            {/* 1. Again (もう一度) */}
             <button
+              disabled={isTransitioning}
               onClick={() => handleRating("again")}
-              className="flex flex-col items-center justify-center rounded-xl border border-rose-500/40 bg-rose-950/20 py-2.5 px-1 text-rose-300 transition-colors hover:bg-rose-950/30 active:scale-95"
+              className="flex flex-col items-center justify-center rounded-2xl border-2 border-rose-500/50 bg-rose-950/30 py-3.5 px-1 text-rose-200 transition-all hover:bg-rose-950/50 active:scale-95 active:bg-rose-600 active:text-white shadow-lg touch-manipulation cursor-pointer disabled:opacity-50"
             >
-              <span className="text-xs font-bold whitespace-nowrap">もう一度</span>
-              <span className="text-[10px] text-rose-400 font-mono tabular-nums whitespace-nowrap mt-0.5">本日中</span>
+              <span className="text-xs sm:text-sm font-black whitespace-nowrap">もう一度</span>
+              <span className="text-[10px] text-rose-300 font-mono font-bold whitespace-nowrap mt-0.5">
+                本日中
+              </span>
             </button>
 
-            {/* 2. Hard */}
+            {/* 2. Hard (難しい) */}
             <button
+              disabled={isTransitioning}
               onClick={() => handleRating("hard")}
-              className="flex flex-col items-center justify-center rounded-xl border border-amber-500/40 bg-amber-950/20 py-2.5 px-1 text-amber-300 transition-colors hover:bg-amber-950/30 active:scale-95"
+              className="flex flex-col items-center justify-center rounded-2xl border-2 border-amber-500/50 bg-amber-950/30 py-3.5 px-1 text-amber-200 transition-all hover:bg-amber-950/50 active:scale-95 active:bg-amber-600 active:text-white shadow-lg touch-manipulation cursor-pointer disabled:opacity-50"
             >
-              <span className="text-xs font-bold whitespace-nowrap">難しい</span>
-              <span className="text-[10px] text-amber-400 font-mono tabular-nums whitespace-nowrap mt-0.5">1日後</span>
+              <span className="text-xs sm:text-sm font-black whitespace-nowrap">難しい</span>
+              <span className="text-[10px] text-amber-300 font-mono font-bold whitespace-nowrap mt-0.5">
+                1日後
+              </span>
             </button>
 
-            {/* 3. Good */}
+            {/* 3. Good (覚えた) */}
             <button
+              disabled={isTransitioning}
               onClick={() => handleRating("good")}
-              className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/20 py-2.5 px-1 text-emerald-300 transition-colors hover:bg-emerald-950/30 active:scale-95"
+              className="flex flex-col items-center justify-center rounded-2xl border-2 border-emerald-500/50 bg-emerald-950/30 py-3.5 px-1 text-emerald-200 transition-all hover:bg-emerald-950/50 active:scale-95 active:bg-emerald-600 active:text-white shadow-lg touch-manipulation cursor-pointer disabled:opacity-50"
             >
-              <span className="text-xs font-bold whitespace-nowrap">覚えた</span>
-              <span className="text-[10px] text-emerald-400 font-mono tabular-nums whitespace-nowrap mt-0.5">
+              <span className="text-xs sm:text-sm font-black whitespace-nowrap">覚えた</span>
+              <span className="text-[10px] text-emerald-300 font-mono font-bold whitespace-nowrap mt-0.5">
                 {SRS_INTERVALS[Math.min(5, (currentCard.boxLevel || 0) + 1)] || 3}日後
               </span>
             </button>
 
-            {/* 4. Easy */}
+            {/* 4. Easy (かんたん) */}
             <button
+              disabled={isTransitioning}
               onClick={() => handleRating("easy")}
-              className="flex flex-col items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/20 py-2.5 px-1 text-cyan-300 transition-colors hover:bg-cyan-950/30 active:scale-95"
+              className="flex flex-col items-center justify-center rounded-2xl border-2 border-cyan-500/50 bg-cyan-950/30 py-3.5 px-1 text-cyan-200 transition-all hover:bg-cyan-950/50 active:scale-95 active:bg-cyan-600 active:text-white shadow-lg touch-manipulation cursor-pointer disabled:opacity-50"
             >
-              <span className="text-xs font-bold whitespace-nowrap">かんたん</span>
-              <span className="text-[10px] text-cyan-400 font-mono tabular-nums whitespace-nowrap mt-0.5">
+              <span className="text-xs sm:text-sm font-black whitespace-nowrap">かんたん</span>
+              <span className="text-[10px] text-cyan-300 font-mono font-bold whitespace-nowrap mt-0.5">
                 {(SRS_INTERVALS[Math.min(5, (currentCard.boxLevel || 0) + 2)] || 7) + 3}日後
               </span>
             </button>

@@ -17,6 +17,12 @@
   .safe-bottom {
     padding-bottom: max(env(safe-area-inset-bottom, 0.75rem), 0.75rem);
   }
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top, 0px), 0px);
+  }
+  .safe-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }

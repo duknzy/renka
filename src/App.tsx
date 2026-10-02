@@ -215,6 +215,10 @@ export default function App() {
     });
   }, [allCards, selectedSubject, selectedLessonIds]);
 
+  const scopedDueCards = useMemo(() => {
+    return scopedCards.filter((c) => c.isDue);
+  }, [scopedCards]);
+
   const handleToggleLesson = (lessonId: string) => {
     setSelectedLessonIds((prev) => {
       if (prev.includes(lessonId)) {
@@ -361,16 +365,21 @@ export default function App() {
 
       {/* Floating Bottom Nav for Quick Scope Switching */}
       {currentMode === "dashboard" && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/[0.08] bg-black/90 backdrop-blur-xl safe-bottom">
-          <div className="mx-auto flex h-14 max-w-lg items-center justify-around px-4">
+        <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/[0.08] bg-black/95 backdrop-blur-2xl safe-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.8)]">
+          <div className="mx-auto flex h-16 max-w-lg items-center justify-between px-2">
+            {/* 1. Home */}
             <button
               onClick={() => setCurrentMode("dashboard")}
-              className="flex flex-col items-center gap-1 text-[11px] font-bold text-white whitespace-nowrap"
+              className="flex-1 h-full flex flex-col items-center justify-center gap-1 py-1 rounded-2xl text-white touch-manipulation cursor-pointer active:scale-95 active:bg-white/[0.08] transition-all"
             >
-              <Home className="h-4 w-4" />
-              <span>ホーム</span>
+              <div className="relative">
+                <Home className="h-5 w-5 text-white" />
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+              </div>
+              <span className="text-[11px] font-extrabold tracking-tight whitespace-nowrap">ホーム</span>
             </button>
 
+            {/* 2. Flashcard Training */}
             <button
               onClick={() => {
                 if (scopedCards.length === 0) return;
@@ -378,33 +387,54 @@ export default function App() {
                 handleStartFlashcards(due.length > 0 ? due : scopedCards);
               }}
               disabled={scopedCards.length === 0}
-              className="flex flex-col items-center gap-1 text-[11px] font-medium text-zinc-400 hover:text-white disabled:opacity-25 whitespace-nowrap transition-colors"
+              className="flex-1 h-full flex flex-col items-center justify-center gap-1 py-1 rounded-2xl text-zinc-300 hover:text-white disabled:opacity-30 touch-manipulation cursor-pointer active:scale-95 active:bg-white/[0.08] transition-all group"
             >
-              <Play className="h-4 w-4" />
-              <span>特訓</span>
+              <div className="relative">
+                <div className="flex h-5 w-5 items-center justify-center">
+                  <Play className="h-4 w-4 fill-white text-white group-hover:scale-110 transition-transform" />
+                </div>
+                {scopedDueCards.length > 0 && (
+                  <span className="absolute -top-1.5 -right-3 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-amber-500 text-black text-[9px] font-black tabular-nums shadow-md">
+                    {scopedDueCards.length > 99 ? "99+" : scopedDueCards.length}
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] font-bold text-zinc-300 group-hover:text-white whitespace-nowrap">
+                特訓開始
+              </span>
             </button>
 
+            {/* 3. Red Sheet */}
             <button
               onClick={() => {
                 if (scopedCards.length === 0) return;
                 handleStartRedSheet(scopedCards);
               }}
               disabled={scopedCards.length === 0}
-              className="flex flex-col items-center gap-1 text-[11px] font-medium text-zinc-400 hover:text-white disabled:opacity-25 whitespace-nowrap transition-colors"
+              className="flex-1 h-full flex flex-col items-center justify-center gap-1 py-1 rounded-2xl text-zinc-300 hover:text-white disabled:opacity-30 touch-manipulation cursor-pointer active:scale-95 active:bg-white/[0.08] transition-all group"
             >
-              <Eye className="h-4 w-4" />
-              <span>赤シート</span>
+              <div className="relative">
+                <Eye className="h-5 w-5 text-rose-400 group-hover:scale-110 transition-transform" />
+              </div>
+              <span className="text-[11px] font-bold text-zinc-300 group-hover:text-white whitespace-nowrap">
+                赤シート
+              </span>
             </button>
 
+            {/* 4. Add Card */}
             <button
               onClick={() => setIsNewCardModalOpen(true)}
-              className="flex flex-col items-center gap-1 text-[11px] font-medium text-zinc-400 hover:text-white whitespace-nowrap transition-colors"
+              className="flex-1 h-full flex flex-col items-center justify-center gap-1 py-1 rounded-2xl text-zinc-300 hover:text-white touch-manipulation cursor-pointer active:scale-95 active:bg-white/[0.08] transition-all group"
             >
-              <PlusCircle className="h-4 w-4" />
-              <span>追加</span>
+              <div className="relative">
+                <PlusCircle className="h-5 w-5 text-zinc-300 group-hover:text-white group-hover:scale-110 transition-transform" />
+              </div>
+              <span className="text-[11px] font-bold text-zinc-300 group-hover:text-white whitespace-nowrap">
+                カード追加
+              </span>
             </button>
           </div>
-        </div>
+        </nav>
       )}
 
       {/* Modals */}

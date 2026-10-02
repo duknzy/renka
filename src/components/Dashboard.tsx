@@ -175,7 +175,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   key={subj}
                   onClick={() => onSelectSubject(subj)}
-                  className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 border ${
+                  className={`shrink-0 rounded-xl px-4 py-2.5 min-h-[44px] text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 border touch-manipulation cursor-pointer active:scale-95 ${
                     isSelected
                       ? "bg-white text-black font-extrabold border-white shadow-[0_0_20px_rgba(255,255,255,0.18)]"
                       : "bg-[#0d0e12] text-zinc-400 border-white/[0.08] hover:text-zinc-200 hover:border-white/[0.16]"
@@ -323,23 +323,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-2 pt-1">
             <button
               onClick={() => onStartSession(scopedDueCards.length > 0 ? scopedDueCards : scopedCards)}
-              className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white text-black font-extrabold text-xs transition-all hover:bg-zinc-100 active:scale-[0.98] shadow-[0_0_25px_rgba(255,255,255,0.18)]"
+              className="w-full flex items-center justify-between min-h-[58px] p-4 rounded-2xl bg-white text-black font-black text-sm transition-all hover:bg-zinc-100 active:scale-[0.98] shadow-[0_0_30px_rgba(255,255,255,0.2)] touch-manipulation cursor-pointer"
             >
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <Play className="h-4 w-4 fill-black shrink-0" />
-                <span className="whitespace-nowrap truncate text-sm">
-                  {scopedDueCards.length > 0
-                    ? `フラッシュカード特訓 (要復習 ${scopedDueCards.length.toLocaleString()}問)`
-                    : `フラッシュカード特訓 (全 ${scopedCards.length.toLocaleString()}問)`}
-                </span>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-black text-white shrink-0">
+                  <Play className="h-4 w-4 fill-white ml-0.5" />
+                </div>
+                <div className="text-left min-w-0 flex-1">
+                  <span className="whitespace-nowrap truncate text-sm font-extrabold block">
+                    {scopedDueCards.length > 0
+                      ? `フラッシュカード特訓 (要復習 ${scopedDueCards.length.toLocaleString()}問)`
+                      : `フラッシュカード特訓 (全 ${scopedCards.length.toLocaleString()}問)`}
+                  </span>
+                  <span className="text-[10px] text-zinc-600 block mt-0.5">
+                    SRS分散アルゴリズムで定着暗記
+                  </span>
+                </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-zinc-600 shrink-0 ml-2" />
+              <ChevronRight className="h-5 w-5 text-zinc-500 shrink-0 ml-2" />
             </button>
 
             {scopedDueCards.length > 0 && scopedDueCards.length < scopedCards.length && (
               <button
                 onClick={() => onStartSession(scopedCards)}
-                className="w-full py-2.5 px-3 rounded-xl border border-white/[0.08] bg-[#0c0d12] hover:bg-zinc-900 text-[11px] font-semibold text-zinc-300 transition-colors text-center whitespace-nowrap"
+                className="w-full py-3 px-3 min-h-[46px] rounded-xl border border-white/[0.08] bg-[#0c0d12] hover:bg-zinc-900 active:scale-[0.98] text-xs font-semibold text-zinc-300 transition-all text-center whitespace-nowrap touch-manipulation cursor-pointer"
               >
                 全 {scopedCards.length.toLocaleString()}問をまとめて演習
               </button>
@@ -349,14 +356,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Mode 2: Red Sheet Mode */}
           <button
             onClick={() => onStartRedSheet(scopedCards)}
-            className="w-full flex items-center justify-between p-3.5 rounded-xl border border-rose-500/25 bg-gradient-to-r from-rose-950/20 to-[#0e0f14] hover:border-rose-500/40 text-zinc-100 transition-all active:scale-[0.98]"
+            className="w-full flex items-center justify-between min-h-[58px] p-4 rounded-2xl border border-rose-500/30 bg-gradient-to-r from-rose-950/30 to-[#0e0f14] hover:border-rose-500/50 text-zinc-100 transition-all active:scale-[0.98] touch-manipulation cursor-pointer shadow-lg"
           >
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                <Eye className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                <Eye className="h-4 w-4" />
               </div>
               <div className="text-left min-w-0 flex-1">
-                <div className="text-xs font-bold text-white whitespace-nowrap truncate">
+                <div className="text-sm font-bold text-white whitespace-nowrap truncate">
                   赤シート暗記一覧 ({scopedCards.length.toLocaleString()}問)
                 </div>
                 <div className="text-[10px] text-zinc-400 whitespace-nowrap truncate mt-0.5">
@@ -364,7 +371,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 text-zinc-500 shrink-0 ml-2" />
+            <ChevronRight className="h-5 w-5 text-zinc-500 shrink-0 ml-2" />
           </button>
         </div>
       ) : (
