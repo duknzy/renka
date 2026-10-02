@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom, 0.75rem), 0.75rem);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .glass-panel {
+    background: rgba(14, 15, 20, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .obsidian-card {
+    background: linear-gradient(180deg, #121319 0%, #0a0b0e 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+}
+
+/* Sophisticated Obsidian Pure Black Typography & Aesthetics */
+:root {
+  font-feature-settings: "palt" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #000000;
+  color: #f4f4f5;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.3) 0%, transparent 65%),
+    linear-gradient(180deg, #050608 0%, #000000 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Custom styling for KaTeX in high-contrast obsidian mode */
+.katex {
+  font-size: 1.08em;
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
+}
+.katex-display {
+  margin: 0.4em 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
+
+/* Red sheet cellophane effect (Translucent ruby acrylic filter) */
+.red-sheet-mask {
+  background: #b91c1c;
+  color: transparent !important;
+  user-select: none;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 16px rgba(185, 28, 28, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.red-sheet-mask * {
+  color: transparent !important;
+  visibility: hidden;
+}
+.red-sheet-revealed {
+  background: rgba(185, 28, 28, 0.15);
+  color: #fca5a5 !important;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+
