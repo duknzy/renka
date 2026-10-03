@@ -84,6 +84,7 @@ export function extractAllCards(
 
       // 復習対象（未学習、または期日が今日以前）
       const isDue = (boxLevel === 0) || (!nextDate || nextDate <= today);
+      const isDueStrict = (Boolean(nextDate && nextDate <= today)) || (boxLevel === 1);
       const isMastered = boxLevel >= 4;
 
       const userMemoRaw = allCardMemos[progressKey] || allCardMemos[legacyKey1] || "";
@@ -106,6 +107,7 @@ export function extractAllCards(
         lapses: lapses,
         nextReviewDate: nextDate,
         isDue: isDue,
+        isDueStrict: isDueStrict,
         isMastered: isMastered,
         userMemo: userMemo
       });
@@ -124,6 +126,7 @@ export function extractAllCards(
     const reps = prog.reps || 0;
     const nextDate = prog.nextReviewDate || null;
     const isDue = (boxLevel === 0) || (!nextDate || nextDate <= today);
+      const isDueStrict = (Boolean(nextDate && nextDate <= today)) || (boxLevel === 1);
     const isMastered = boxLevel >= 4;
 
     const userMemoRaw = allCardMemos[progressKey] || allCardMemos[legacyKey] || "";
@@ -145,6 +148,7 @@ export function extractAllCards(
       lapses: lapses,
       nextReviewDate: nextDate,
       isDue: isDue,
+        isDueStrict: isDueStrict,
       isMastered: isMastered,
       userMemo: userMemo
     });

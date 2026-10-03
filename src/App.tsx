@@ -216,7 +216,7 @@ export default function App() {
   }, [allCards, selectedSubject, selectedLessonIds]);
 
   const scopedDueCards = useMemo(() => {
-    return scopedCards.filter((c) => c.isDue);
+    return scopedCards.filter((c) => c.isDueStrict || c.boxLevel === 1);
   }, [scopedCards]);
 
   const handleToggleLesson = (lessonId: string) => {
@@ -383,7 +383,7 @@ export default function App() {
             <button
               onClick={() => {
                 if (scopedCards.length === 0) return;
-                const due = scopedCards.filter((c) => c.isDue);
+                const due = scopedCards.filter((c) => c.isDueStrict || c.boxLevel === 1);
                 handleStartFlashcards(due.length > 0 ? due : scopedCards);
               }}
               disabled={scopedCards.length === 0}

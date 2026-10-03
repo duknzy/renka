@@ -53,6 +53,7 @@ export interface CardItem {
   lapses: number;
   nextReviewDate: string | null;
   isDue: boolean;
+  isDueStrict: boolean;
   isMastered: boolean;
   userMemo?: string;
 }
